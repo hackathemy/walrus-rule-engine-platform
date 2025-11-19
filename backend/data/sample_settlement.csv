@@ -1,0 +1,14 @@
+player_id,timestamp,amount,item,payment_method,status
+0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef,2025-11-01T10:00:00Z,49.99,Premium Pack,credit_card,completed
+0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef,2025-11-05T14:30:00Z,99.99,Legendary Weapon,credit_card,completed
+0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef,2025-11-08T09:15:00Z,19.99,Energy Boost,paypal,completed
+0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef,2025-11-12T20:45:00Z,149.99,Ultimate Bundle,credit_card,completed
+0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef,2025-11-15T11:20:00Z,9.99,Daily Gems,credit_card,completed
+0x2234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef,2025-11-02T15:30:00Z,9.99,Starter Pack,credit_card,completed
+0x2234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef,2025-11-10T18:45:00Z,19.99,Weapon Upgrade,paypal,completed
+0x2234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef,2025-11-14T12:00:00Z,4.99,Health Potion,credit_card,completed
+0x3334567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef,2025-11-03T08:00:00Z,299.99,Elite Bundle,credit_card,completed
+0x3334567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef,2025-11-04T08:15:00Z,199.99,VIP Pass,credit_card,completed
+0x3334567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef,2025-11-06T20:30:00Z,99.99,Premium Currency,credit_card,completed
+0x3334567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef,2025-11-09T21:00:00Z,149.99,Legendary Skin,credit_card,completed
+0x3334567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef,2025-11-13T22:15:00Z,249.99,Ultimate Edition,credit_card,completed

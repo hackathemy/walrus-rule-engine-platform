@@ -1,0 +1,78 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+.installed.cfg
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.vercel/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+*.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Sui / Move
+.sui/
+build/
+*.lock
+contracts/build/
+
+# AWS SAM
+.aws-sam/
+samconfig.toml
+
+# Walrus
+walrus-cache/
+*.blob
+
+# Claude Code
+.claude/
+
+# Temporary
+*.tmp
+*.temp
+tmp/
+temp/
+logs/
+claudedocs/
