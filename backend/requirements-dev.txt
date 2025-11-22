@@ -1,0 +1,6 @@
+# Development dependencies for local server
+Flask>=3.0.0
+flask-cors>=4.0.0
+
+# Include lambda requirements
+-r lambda/requirements.txt
