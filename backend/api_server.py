@@ -15,8 +15,11 @@ from dotenv import load_dotenv
 walrus_service_module = importlib.import_module('lambda.walrus_service')
 WalrusService = walrus_service_module.WalrusService
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from root directory
+from pathlib import Path
+root_dir = Path(__file__).parent.parent
+dotenv_path = root_dir / '.env'
+load_dotenv(dotenv_path=dotenv_path)
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend
