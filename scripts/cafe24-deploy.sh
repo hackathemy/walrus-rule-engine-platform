@@ -12,12 +12,12 @@ echo "========================================"
 # 1. 시스템 업데이트
 echo ""
 echo "📦 1/7 시스템 업데이트..."
-apt update -qq
+sudo apt update -qq
 
 # 2. 기본 패키지
 echo ""
 echo "📦 2/7 기본 패키지 설치..."
-apt install -y git curl wget build-essential
+sudo apt install -y git curl wget build-essential
 
 # 3. Node.js 설치
 echo ""
@@ -57,7 +57,7 @@ done
 # Python 3.8+ 없으면 설치
 if [ -z "$PYTHON_CMD" ]; then
     echo "⚠️  Python 3.8+ 없음. Python 3.11 설치 중..."
-    apt install -y python3.11 python3.11-venv python3-pip
+    sudo apt install -y python3.11 python3.11-venv python3-pip
     PYTHON_CMD=python3.11
     echo "✅ Python 3.11 설치 완료"
 fi
@@ -163,9 +163,9 @@ echo "  ✅ PM2 프로세스 저장 완료"
 echo ""
 echo "🔒 방화벽 설정..."
 if command -v ufw &> /dev/null; then
-    ufw allow 22/tcp 2>/dev/null || true
-    ufw allow 8000/tcp 2>/dev/null || true
-    ufw allow 3001/tcp 2>/dev/null || true
+    sudo ufw allow 22/tcp 2>/dev/null || true
+    sudo ufw allow 8000/tcp 2>/dev/null || true
+    sudo ufw allow 3001/tcp 2>/dev/null || true
     echo "  ✅ UFW 방화벽 규칙 추가 완료"
 fi
 
