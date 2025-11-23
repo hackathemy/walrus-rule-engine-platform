@@ -6,8 +6,8 @@
 
 **The first decentralized marketplace for AI analytics templates**, where:
 - 🛠️ **Ruleset Creators** configure & sell analytics templates (configs on Walrus)
-- 📊 **Ruleset Users** execute analytics on their data (powered by Bedrock)
-- ✅ All results are verifiable, immutable, and on-chain (secured by Sui + Walrus)
+- 📊 **Ruleset Users** execute analytics on their data (multi-provider AI: Anthropic / Bedrock / Mock)
+- ✅ All configurations are verifiable and immutable on Walrus (secured by Sui + Walrus)
 
 ### Why This Matters
 - **For Creators**: Monetize expertise by configuring pre-built templates → Earn SUI per execution
@@ -27,7 +27,7 @@
 │  1. Select pre-built template (e.g., Game Abuse Detection)  │
 │  2. Configure parameters (thresholds, indicators)            │
 │  3. Upload config to Walrus → Get blob_id                   │
-│  4. Mint Ruleset NFT on Sui (blob_id + price)               │
+│  4. Save to localStorage → Instant marketplace listing      │
 │  5. Earn SUI when users execute                             │
 └──────────────────────────────────────────────────────────────┘
                             ↓
@@ -37,8 +37,9 @@
 │  1. Browse marketplace (Gaming, DeFi, Social, IoT)          │
 │  2. Upload data (CSV/JSON) → Walrus                         │
 │  3. Select ruleset + Pay (creator fee + platform fee)       │
-│  4. Backend executes → Bedrock AI analysis                  │
-│  5. Receive Result NFT → Verifiable results on Walrus       │
+│  4. Backend executes → Real-time AI analysis                │
+│  5. Receive analysis results → Display immediately          │
+│  6. Execution history saved in localStorage                 │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -47,54 +48,53 @@
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  FRONTEND (Next.js)                                         │
-│  - Browse marketplace                                       │
-│  - Upload data to Walrus                                    │
-│  - Initiate execution via Sui transaction                   │
+│  - Browse marketplace (loads from localStorage + defaults) │
+│  - Upload data to Walrus via backend                        │
+│  - Create templates → localStorage → immediate listing     │
+│  - Execute analysis via direct API call                     │
+└────────────────────┬────────────────────────────────────────┘
+                     │ Direct API call
+                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│  BACKEND SERVICE (Python Flask)                             │
+│  http://localhost:8000                                      │
+│                                                             │
+│  POST /api/upload:                                          │
+│  1. Receive multipart/form-data                            │
+│  2. Upload to Walrus Publisher via HTTP PUT                │
+│  3. Return actual blob_id + aggregator_url                 │
+│                                                             │
+│  POST /api/execute:                                         │
+│  1. Receive: config_blob_id, data_blob_id, template_id    │
+│  2. Download config from Walrus Aggregator                 │
+│  3. Download data from Walrus Aggregator                   │
+│  4. Create AI analysis prompt with template params         │
+│  5. Call AI (auto-detect: Anthropic → Bedrock → Mock)     │
+│     - Claude 3 Haiku (Anthropic API)                       │
+│     - Claude 3.5 Sonnet (AWS Bedrock)                      │
+│     - Mock AI (instant demo)                               │
+│  6. Parse JSON response (summary, findings, etc.)          │
+│  7. Return analysis results immediately                    │
+│                                                             │
+│  GET /api/blob/<blob_id>:                                  │
+│  - Proxy read from Walrus Aggregator                       │
+│  - Supports JSON, CSV, text formats                        │
 └────────────────────┬────────────────────────────────────────┘
                      │
                      ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  SUI BLOCKCHAIN (On-Chain)                                  │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │ RulesetNFT                                          │   │
-│  │ - template_id (pre-built templates only)           │   │
-│  │ - config_blob_id (Walrus)                          │   │
-│  │ - price (SUI)                                       │   │
-│  │ - creator (address)                                 │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                                                             │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │ ExecutionRequest (Event)                            │   │
-│  │ - ruleset_id                                        │   │
-│  │ - data_blob_id                                      │   │
-│  │ - user                                              │   │
-│  └─────────────────────────────────────────────────────┘   │
-└────────────────────┬────────────────────────────────────────┘
-                     │ (Event listener)
-                     ▼
+│  WALRUS STORAGE (Decentralized - Testnet)                  │
+│  - Ruleset configs (actually uploaded, verifiable)          │
+│  - User data (actually uploaded, retrievable)               │
+│  - Aggregator URL: https://aggregator.walrus-testnet...    │
+│  - Publisher URL: https://publisher.walrus-testnet...      │
+└─────────────────────────────────────────────────────────────┘
+
 ┌─────────────────────────────────────────────────────────────┐
-│  BACKEND SERVICE (Off-Chain, Centralized)                   │
-│  AWS Lambda / Cloud Run                                     │
-│                                                             │
-│  1. Listen to Sui ExecutionRequest events                  │
-│  2. Download config from Walrus (ruleset config_blob_id)   │
-│  3. Download data from Walrus (user data_blob_id)          │
-│  4. Load pre-built template (SECURE, NO ARBITRARY CODE)    │
-│  5. Execute template with config + data                    │
-│  6. Call Bedrock API (Claude 3.5)                          │
-│  7. Generate analysis results                              │
-│  8. Upload results to Walrus → result_blob_id              │
-│  9. Call Sui contract: recordResult(result_blob_id)        │
-│     - Transfer payment to creator                          │
-│     - Mint Result NFT to user                              │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────────────────────┐
-│  WALRUS STORAGE (Decentralized)                             │
-│  - Ruleset configs (public, immutable)                      │
-│  - User data (can be encrypted)                             │
-│  - Analysis results (public or encrypted)                   │
+│  CLIENT-SIDE STORAGE (localStorage)                         │
+│  - custom_rulesets: Created templates with config_blob_id  │
+│  - execution_history: Analysis results and metadata        │
+│  - uploaded_datasets: Data files with blob_id references   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -124,9 +124,9 @@ class GameAbuseTemplate:
             refund_limit
         )
 
-        # Call Bedrock for AI insights
-        bedrock_prompt = generate_prompt(results)
-        ai_analysis = call_bedrock(bedrock_prompt)
+        # Call AI for insights (Claude 3 Haiku or Mock AI)
+        ai_prompt = generate_prompt(results)
+        ai_analysis = ai_client.generate_text(ai_prompt)
 
         return {
             'flagged_users': results.suspicious_accounts,
@@ -246,14 +246,18 @@ struct ResultNFT has key {
 ### Realistic Pricing Model
 **Template-based approach enables predictable costs**:
 
-| Template | Bedrock Tokens | Cost per Run | Creator Price | Platform Fee | Total User Cost |
-|----------|----------------|--------------|---------------|--------------|-----------------|
-| game_abuse_detection | ~50K tokens | $0.15 | 2.5 SUI | 0.5 SUI | 3 SUI |
-| defi_risk_analyzer | ~30K tokens | $0.09 | 3 SUI | 0.5 SUI | 3.5 SUI |
-| iot_device_health | ~20K tokens | $0.06 | 1.8 SUI | 0.2 SUI | 2 SUI |
+| Template | AI Tokens | Cost (Anthropic) | Cost (Bedrock) | Creator Price | Platform Fee | Total User Cost |
+|----------|-----------|------------------|----------------|---------------|--------------|-----------------|
+| game_abuse_detection | ~10K tokens | $0.003 | $0.02 | 2.5 SUI | 0.5 SUI | 3 SUI |
+| defi_risk_analyzer | ~8K tokens | $0.002 | $0.015 | 3 SUI | 0.5 SUI | 3.5 SUI |
+| iot_device_health | ~5K tokens | $0.0015 | $0.01 | 1.8 SUI | 0.2 SUI | 2 SUI |
 
-**Assumptions**:
-- Claude 3.5 Sonnet: $3/million input tokens, $15/million output tokens
+**AI Provider Pricing**:
+- **Claude 3 Haiku (Anthropic)**: $0.25/$1.25 per MTok (input/output)
+- **Claude 3.5 Sonnet (Bedrock)**: $3/$15 per MTok (input/output)
+- **Mock AI**: $0/run (free demo/testing)
+
+**Infrastructure**:
 - Walrus storage: ~$0.01 per blob (negligible)
 - Sui transaction fees: ~$0.001 (negligible)
 - SUI price: ~$3 USD (testnet/demo purposes)
@@ -263,8 +267,8 @@ struct ResultNFT has key {
 User pays 3 SUI to execute "game_abuse_detection"
 ├─ Creator receives: 2.5 SUI (83%)
 ├─ Platform fee: 0.5 SUI (17%)
-│  ├─ AWS Bedrock cost: ~$0.15 (5%)
-│  └─ Platform profit: ~$1.35 (45% of fee)
+│  ├─ AI cost: ~$0.003 (<1%)
+│  └─ Platform profit: ~$1.50 (nearly all fee)
 └─ Gas fees: <0.01 SUI (<1%)
 ```
 
@@ -272,7 +276,9 @@ User pays 3 SUI to execute "game_abuse_detection"
 **Why template approach is sustainable**:
 - ✅ **Predictable costs**: Pre-built templates have known token usage
 - ✅ **No security overhead**: No need for sandboxing arbitrary code
-- ✅ **Bulk optimization**: Platform can negotiate Bedrock volume pricing
+- ✅ **Flexible pricing**: Choose Haiku (cheap) or Sonnet (powerful) based on needs
+- ✅ **Enterprise ready**: AWS Bedrock for production deployments with compliance
+- ✅ **Mock AI fallback**: Zero-cost demo mode for testing
 - ✅ **Creator incentives**: Earn passive income without operational costs
 
 **Alternative (arbitrary code) problems**:
@@ -284,9 +290,11 @@ User pays 3 SUI to execute "game_abuse_detection"
 ## 🚀 Hackathon Tracks Alignment
 
 ### Primary Track: **AI × Data**
-- ✅ **AI**: Bedrock-powered template execution engine
-- ✅ **Data**: Walrus stores configs + results (immutable, verifiable)
+- ✅ **AI**: Multi-provider AI analysis (Anthropic API / AWS Bedrock / Mock AI)
+- ✅ **Data**: Walrus stores configs + data (immutable, verifiable)
 - ✅ **Marketplace**: Two-sided platform for template configurations
+- ✅ **Real-Time Results**: Immediate AI analysis without blockchain delays
+- ✅ **Enterprise Ready**: AWS Bedrock support for production deployments
 
 ### Why This Wins
 - **Novel Use Case**: First template-based AI analytics marketplace
@@ -297,10 +305,13 @@ User pays 3 SUI to execute "game_abuse_detection"
 ## 📦 Tech Stack
 
 ### Backend
-- **Python 3.11** (AWS Lambda runtime)
-- **boto3** (AWS SDK)
-- **Bedrock Runtime API** (Claude 3.5 Sonnet)
-- **Walrus SDK** (`@mysten/walrus`)
+- **Python 3.11** (Flask server)
+- **Multi-Provider AI**:
+  - **Anthropic SDK** (Claude 3 Haiku - fast & cheap)
+  - **AWS Bedrock SDK** (boto3 - Claude 3.5 Sonnet - enterprise)
+  - **Mock AI Client** (Demo/testing fallback)
+  - **Auto-detection**: Anthropic → Bedrock → Mock
+- **Walrus HTTP API** (Publisher + Aggregator)
 
 ### Blockchain
 - **Sui Move** (Smart contracts)
@@ -314,21 +325,25 @@ User pays 3 SUI to execute "game_abuse_detection"
 - **TailwindCSS** (UI styling)
 
 ### DevOps
-- **AWS SAM** (Serverless deployment)
+- **Flask** (Backend API server)
 - **Sui CLI** (Contract deployment)
-- **GitHub Actions** (CI/CD)
+- **PM2** (Process management)
+- **Vercel** (Frontend deployment)
 
 ## 🛠️ Implementation Roadmap
 
 ### Day 1: Backend Service + Templates (8h)
-- [ ] Set up AWS Lambda event listener (Sui → Backend)
-- [ ] Create template library (3 templates):
-  - [ ] `game_abuse_detection.py` (Gaming)
-  - [ ] `defi_risk_analyzer.py` (DeFi)
-  - [ ] `iot_device_health.py` (IoT)
-- [ ] Implement Bedrock integration (Claude 3.5 Sonnet)
-- [ ] Implement Walrus upload/download service
-- [ ] Create sample configuration JSONs for each template
+- [x] Set up Flask API server with CORS
+- [x] Create template library (6 templates):
+  - [x] `game_abuse_detection.py` (Gaming)
+  - [x] `defi_risk_analyzer.py` (DeFi)
+  - [x] `iot_device_health.py` (IoT)
+  - [x] `game_anti_cheat.py` (Gaming)
+  - [x] `token_holder_segmentation.py` (DeFi)
+  - [x] `social_sentiment_tracker.py` (Social)
+- [x] Implement AI integration (Claude 3 Haiku + Mock AI)
+- [x] Implement Walrus HTTP API service (Publisher + Aggregator)
+- [x] Create `/api/upload` and `/api/execute` endpoints
 
 ### Day 2: Blockchain Layer (8h)
 - [ ] Write Move contracts:

@@ -4,463 +4,517 @@ import { ConnectButton, useCurrentAccount } from "@mysten/dapp-kit";
 import { useState } from "react";
 import Link from "next/link";
 
+// Pre-built template definitions
+const TEMPLATES = {
+  game_abuse_detection: {
+    id: "game_abuse_detection",
+    name: "Gaming Abuse Detection",
+    category: "Gaming",
+    description: "Detect multi-accounting, refund fraud, and bot behavior in games",
+    icon: "🎮",
+    defaultConfig: {
+      multi_account_threshold: 3,
+      refund_velocity_limit: 5,
+      velocity_window_hours: 24,
+      min_playtime_before_refund: 2
+    },
+    parameters: [
+      { key: "multi_account_threshold", label: "Multi-Account Threshold", type: "number", description: "Flag if > N accounts from same IP" },
+      { key: "refund_velocity_limit", label: "Refund Velocity Limit", type: "number", description: "Flag if > N refunds in window" },
+      { key: "velocity_window_hours", label: "Velocity Window (hours)", type: "number", description: "Time window for velocity checks" },
+      { key: "min_playtime_before_refund", label: "Min Playtime (hours)", type: "number", description: "Minimum playtime before refund" }
+    ]
+  },
+  game_anti_cheat: {
+    id: "game_anti_cheat",
+    name: "Game Anti-Cheat",
+    category: "Gaming",
+    description: "Detect speed hacks, aim bots, and impossible scores",
+    icon: "🛡️",
+    defaultConfig: {
+      kd_ratio_max: 8.0,
+      score_velocity_limit: 1500,
+      impossible_movement_threshold: 0.92,
+      headshot_percentage_max: 75
+    },
+    parameters: [
+      { key: "kd_ratio_max", label: "Max K/D Ratio", type: "number", description: "Flag if K/D ratio exceeds this" },
+      { key: "score_velocity_limit", label: "Score Velocity Limit", type: "number", description: "Max points per second" },
+      { key: "impossible_movement_threshold", label: "Movement Threshold", type: "number", description: "Confidence for impossible movement (0-1)" },
+      { key: "headshot_percentage_max", label: "Max Headshot %", type: "number", description: "Flag if headshot % exceeds this" }
+    ]
+  },
+  defi_risk_analyzer: {
+    id: "defi_risk_analyzer",
+    name: "DeFi Risk Analyzer",
+    category: "DeFi",
+    description: "Assess lending risk and liquidity pool health",
+    icon: "💰",
+    defaultConfig: {
+      collateral_ratio_min: 150,
+      liquidity_threshold: 10000,
+      volatility_max: 15,
+      whale_movement_threshold: 1000000
+    },
+    parameters: [
+      { key: "collateral_ratio_min", label: "Min Collateral Ratio (%)", type: "number", description: "Minimum safe collateral ratio" },
+      { key: "liquidity_threshold", label: "Liquidity Threshold", type: "number", description: "Minimum pool liquidity" },
+      { key: "volatility_max", label: "Max Volatility (%)", type: "number", description: "Alert if volatility exceeds this" },
+      { key: "whale_movement_threshold", label: "Whale Threshold (USD)", type: "number", description: "Monitor movements above this value" }
+    ]
+  },
+  token_holder_segmentation: {
+    id: "token_holder_segmentation",
+    name: "Token Holder Segmentation",
+    category: "DeFi",
+    description: "Segment holders into HODLers, traders, and potential wash traders",
+    icon: "📊",
+    defaultConfig: {
+      holding_period_days: 30,
+      trade_frequency_threshold: 10,
+      wash_trading_similarity: 0.85
+    },
+    parameters: [
+      { key: "holding_period_days", label: "HODLer Period (days)", type: "number", description: "Days to qualify as HODLer" },
+      { key: "trade_frequency_threshold", label: "Trader Frequency", type: "number", description: "Trades/month to qualify as trader" },
+      { key: "wash_trading_similarity", label: "Wash Trading Score", type: "number", description: "Similarity threshold (0-1)" }
+    ]
+  },
+  social_sentiment_tracker: {
+    id: "social_sentiment_tracker",
+    name: "Social Sentiment Tracker",
+    category: "Social",
+    description: "Track real-time sentiment and trending topics",
+    icon: "🐦",
+    defaultConfig: {
+      sentiment_window_hours: 24,
+      min_mentions: 100,
+      trending_threshold: 0.8
+    },
+    parameters: [
+      { key: "sentiment_window_hours", label: "Sentiment Window (hours)", type: "number", description: "Time window for sentiment analysis" },
+      { key: "min_mentions", label: "Min Mentions", type: "number", description: "Minimum mentions to include" },
+      { key: "trending_threshold", label: "Trending Threshold", type: "number", description: "Score to qualify as trending (0-1)" }
+    ]
+  },
+  iot_device_health: {
+    id: "iot_device_health",
+    name: "IoT Device Health Monitor",
+    category: "IoT",
+    description: "Predictive maintenance and anomaly detection for IoT devices",
+    icon: "📡",
+    defaultConfig: {
+      uptime_threshold: 95,
+      anomaly_sensitivity: 0.85,
+      maintenance_prediction_days: 7
+    },
+    parameters: [
+      { key: "uptime_threshold", label: "Min Uptime (%)", type: "number", description: "Alert if uptime below this" },
+      { key: "anomaly_sensitivity", label: "Anomaly Sensitivity", type: "number", description: "Detection sensitivity (0-1)" },
+      { key: "maintenance_prediction_days", label: "Prediction Horizon (days)", type: "number", description: "Days ahead to predict" }
+    ]
+  }
+};
+
 export default function CreatePage() {
   const account = useCurrentAccount();
-  const [step, setStep] = useState(1);
-  const [ruleset, setRuleset] = useState({
-    name: "",
-    description: "",
-    category: "gaming",
-    ruleType: "ai" as "ai" | "sql" | "python",
-    price: 50,
-    content: "",
-  });
-  const [testData, setTestData] = useState("");
-  const [testResult, setTestResult] = useState<any>(null);
-  const [testing, setTesting] = useState(false);
-  const [minting, setMinting] = useState(false);
-  const [mintedNFT, setMintedNFT] = useState<any>(null);
+  const [step, setStep] = useState(1); // 1: Select Template, 2: Configure, 3: Upload & Mint
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [rulesetName, setRulesetName] = useState("");
+  const [rulesetDescription, setRulesetDescription] = useState("");
+  const [price, setPrice] = useState(2.5);
+  const [config, setConfig] = useState<any>({});
+  const [uploading, setUploading] = useState(false);
+  const [uploadResult, setUploadResult] = useState<any>(null);
 
-  const ruleTemplates = {
-    ai: {
-      whale: `Analyze this player spending data and identify whales (high-value players).
+  const template = selectedTemplate ? TEMPLATES[selectedTemplate as keyof typeof TEMPLATES] : null;
 
-Return JSON with:
-- whale_count: number of whales found
-- whale_ids: array of player IDs
-- avg_whale_spend: average spending amount
-- recommendations: suggestions for engagement`,
+  const handleTemplateSelect = (templateId: string) => {
+    setSelectedTemplate(templateId);
+    const tmpl = TEMPLATES[templateId as keyof typeof TEMPLATES];
+    setConfig(tmpl.defaultConfig);
+    setRulesetName(`${tmpl.name} Pro`);
+    setRulesetDescription(`Optimized ${tmpl.name.toLowerCase()} configuration`);
+    setStep(2);
+  };
 
-      fraud: `Analyze payment patterns for fraud indicators.
+  const handleConfigChange = (key: string, value: any) => {
+    setConfig({ ...config, [key]: value });
+  };
 
-Return JSON with:
-- fraud_score: 0-100 risk score
-- flags: array of suspicious patterns
-- high_risk_users: array of user IDs
-- recommended_actions: what to do next`,
+  const handleUploadAndMint = async () => {
+    if (!account || !template) return;
 
-      churn: `Predict which players are likely to stop playing in next 30 days.
+    setUploading(true);
 
-Return JSON with:
-- churn_risk_count: number at risk
-- at_risk_players: array of player IDs with risk scores
-- key_factors: main reasons for churn
-- retention_strategies: recommended actions`,
+    try {
+      // Create config JSON
+      const configData = {
+        template_id: selectedTemplate,
+        name: rulesetName,
+        description: rulesetDescription,
+        config: config,
+        price_per_execution: price,
+        creator: account.address
+      };
+
+      // Convert to JSON blob
+      const configBlob = new Blob([JSON.stringify(configData, null, 2)], {
+        type: 'application/json'
+      });
+
+      // Upload to Walrus via backend
+      const formData = new FormData();
+      formData.append('file', configBlob, `config_${Date.now()}.json`);
+      formData.append('epochs', '5');
+
+      const response = await fetch('http://localhost:8000/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Upload failed');
+      }
+
+      // Create ruleset object
+      const newRuleset = {
+        id: Date.now().toString(),
+        name: `${template.icon} ${rulesetName}`,
+        description: rulesetDescription,
+        creator: `@${account.address.slice(0, 6)}`,
+        category: template.category,
+        templateId: selectedTemplate,
+        price: price,
+        totalUses: 0,
+        rating: 0,
+        config_blob_id: result.blob_id,
+        created_at: new Date().toISOString()
+      };
+
+      // Save to localStorage
+      const existingRulesets = JSON.parse(localStorage.getItem('custom_rulesets') || '[]');
+      existingRulesets.push(newRuleset);
+      localStorage.setItem('custom_rulesets', JSON.stringify(existingRulesets));
+
+      // Set upload result
+      const uploadResult = {
+        config_blob_id: result.blob_id,
+        ruleset_nft_id: `0x${newRuleset.id}`,
+        marketplace_url: `/marketplace`,
+        estimated_earnings: `${(price * 0.83 * 10).toFixed(2)} SUI (if 10 executions)`,
+        aggregator_url: result.aggregator_url
+      };
+
+      setUploadResult(uploadResult);
+      setStep(3);
+    } catch (error) {
+      console.error("Upload error:", error);
+      alert(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setUploading(false);
     }
   };
 
-  const handleTest = async () => {
-    if (!testData || !ruleset.content) return;
-
-    setTesting(true);
-    setTestResult(null);
-
-    // Mock AI analysis
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // Generate mock result based on rule type
-    const mockResult = {
-      success: true,
-      analysis: {
-        whale_count: 3,
-        whale_ids: ["player_001", "player_005", "player_012"],
-        avg_whale_spend: 1250.50,
-        recommendations: [
-          "Create VIP tier for top 3 spenders",
-          "Offer exclusive items to maintain engagement",
-          "Personalized communication strategy"
-        ]
-      },
-      execution_time: "1.2s",
-      timestamp: new Date().toISOString(),
-    };
-
-    setTestResult(mockResult);
-    setTesting(false);
-  };
-
-  const handleMint = async () => {
-    if (!account) return;
-
-    setMinting(true);
-
-    // Mock NFT minting
-    await new Promise(resolve => setTimeout(resolve, 2500));
-
-    const mockNFT = {
-      id: `ruleset_${Date.now()}`,
-      tx_digest: `0x${Array.from({length: 64}, () =>
-        Math.floor(Math.random() * 16).toString(16)
-      ).join('')}`,
-      blob_id: `walrus_rule_${Math.random().toString(36).substr(2, 9)}`,
-      ...ruleset,
-    };
-
-    setMintedNFT(mockNFT);
-    setMinting(false);
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
       {/* Header */}
-      <header className="border-b bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-3">
-              <div className="text-3xl">🐋</div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  Walrus RuleEngine
-                </h1>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Create Ruleset
-                </p>
-              </div>
-            </Link>
-            <div className="flex items-center gap-4">
-              <Link href="/marketplace" className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
-                Marketplace
-              </Link>
-              <Link href="/upload" className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
-                Upload Data
-              </Link>
-              <ConnectButton />
+      <header className="border-b border-gray-200 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="text-3xl group-hover:scale-110 transition-transform">🐋</div>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">Walrus Insight Engine</h1>
+              <p className="text-xs text-gray-600">Configure & Earn</p>
             </div>
-          </div>
+          </Link>
+          <ConnectButton />
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        {/* Page Title */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Create Your Ruleset
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400">
-            Build AI-powered analysis tools and earn passive income
-          </p>
-        </div>
-
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-6 py-12">
         {/* Progress Steps */}
-        <div className="flex items-center justify-between mb-8">
-          {[1, 2, 3].map((s) => (
-            <div key={s} className="flex items-center flex-1">
-              <div className={`flex items-center justify-center w-10 h-10 rounded-full ${
-                step >= s ? "bg-blue-600 text-white" : "bg-gray-300 dark:bg-gray-700 text-gray-600"
-              }`}>
-                {s}
-              </div>
-              {s < 3 && (
-                <div className={`flex-1 h-1 mx-2 ${
-                  step > s ? "bg-blue-600" : "bg-gray-300 dark:bg-gray-700"
-                }`} />
-              )}
+        <div className="mb-12 flex items-center justify-center gap-4">
+          <div className={`flex items-center gap-2 ${step >= 1 ? 'text-blue-600' : 'text-gray-400'}`}>
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${step >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
+              1
             </div>
-          ))}
+            <span className="font-semibold">Select Template</span>
+          </div>
+          <div className="w-12 h-0.5 bg-gray-300"></div>
+          <div className={`flex items-center gap-2 ${step >= 2 ? 'text-blue-600' : 'text-gray-400'}`}>
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${step >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
+              2
+            </div>
+            <span className="font-semibold">Configure</span>
+          </div>
+          <div className="w-12 h-0.5 bg-gray-300"></div>
+          <div className={`flex items-center gap-2 ${step >= 3 ? 'text-blue-600' : 'text-gray-400'}`}>
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${step >= 3 ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
+              3
+            </div>
+            <span className="font-semibold">Upload & Mint</span>
+          </div>
         </div>
 
-        {!mintedNFT ? (
-          <>
-            {/* Step 1: Basic Info */}
-            {step === 1 && (
-              <div className="bg-white dark:bg-gray-800 rounded-lg p-6 space-y-6">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                  Step 1: Basic Information
-                </h3>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Ruleset Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={ruleset.name}
-                    onChange={(e) => setRuleset({...ruleset, name: e.target.value})}
-                    placeholder="e.g., Whale Detector Pro"
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Description *
-                  </label>
-                  <textarea
-                    value={ruleset.description}
-                    onChange={(e) => setRuleset({...ruleset, description: e.target.value})}
-                    placeholder="Describe what your ruleset does..."
-                    rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Category
-                    </label>
-                    <select
-                      value={ruleset.category}
-                      onChange={(e) => setRuleset({...ruleset, category: e.target.value})}
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    >
-                      <option value="gaming">Gaming</option>
-                      <option value="defi">DeFi</option>
-                      <option value="iot">IoT</option>
-                      <option value="social">Social Media</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Type
-                    </label>
-                    <select
-                      value={ruleset.ruleType}
-                      onChange={(e) => setRuleset({...ruleset, ruleType: e.target.value as any})}
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    >
-                      <option value="ai">AI Prompt</option>
-                      <option value="sql">SQL Query</option>
-                      <option value="python">Python Script</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Price (SUI)
-                  </label>
-                  <input
-                    type="number"
-                    value={ruleset.price}
-                    onChange={(e) => setRuleset({...ruleset, price: parseInt(e.target.value)})}
-                    min="1"
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    You'll earn 80% ({(ruleset.price * 0.8).toFixed(0)} SUI) per sale
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => setStep(2)}
-                  disabled={!ruleset.name || !ruleset.description}
-                  className={`w-full py-3 rounded-lg font-bold transition-all ${
-                    !ruleset.name || !ruleset.description
-                      ? "bg-gray-300 dark:bg-gray-700 cursor-not-allowed"
-                      : "bg-blue-600 hover:bg-blue-700 text-white"
-                  }`}
-                >
-                  Next: Write Rule →
-                </button>
-              </div>
-            )}
-
-            {/* Step 2: Write Rule */}
-            {step === 2 && (
-              <div className="space-y-6">
-                <div className="bg-white dark:bg-gray-800 rounded-lg p-6">
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-                    Step 2: Write Your {ruleset.ruleType.toUpperCase()} Rule
-                  </h3>
-
-                  {/* Templates */}
-                  {ruleset.ruleType === "ai" && (
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Quick Templates
-                      </label>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setRuleset({...ruleset, content: ruleTemplates.ai.whale})}
-                          className="px-3 py-1 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 rounded text-sm"
-                        >
-                          Whale Detector
-                        </button>
-                        <button
-                          onClick={() => setRuleset({...ruleset, content: ruleTemplates.ai.fraud})}
-                          className="px-3 py-1 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 rounded text-sm"
-                        >
-                          Fraud Detection
-                        </button>
-                        <button
-                          onClick={() => setRuleset({...ruleset, content: ruleTemplates.ai.churn})}
-                          className="px-3 py-1 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 rounded text-sm"
-                        >
-                          Churn Prediction
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      {ruleset.ruleType === "ai" && "AI Prompt"}
-                      {ruleset.ruleType === "sql" && "SQL Query"}
-                      {ruleset.ruleType === "python" && "Python Code"}
-                    </label>
-                    <textarea
-                      value={ruleset.content}
-                      onChange={(e) => setRuleset({...ruleset, content: e.target.value})}
-                      placeholder={
-                        ruleset.ruleType === "ai"
-                          ? "Analyze this data and return JSON with..."
-                          : ruleset.ruleType === "sql"
-                          ? "SELECT * FROM data WHERE..."
-                          : "def analyze(df):\n    # Your code here\n    return results"
-                      }
-                      rows={12}
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-4">
-                  <button
-                    onClick={() => setStep(1)}
-                    className="flex-1 py-3 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg font-bold hover:bg-gray-300 dark:hover:bg-gray-600"
-                  >
-                    ← Back
-                  </button>
-                  <button
-                    onClick={() => setStep(3)}
-                    disabled={!ruleset.content}
-                    className={`flex-1 py-3 rounded-lg font-bold ${
-                      !ruleset.content
-                        ? "bg-gray-300 dark:bg-gray-700 cursor-not-allowed"
-                        : "bg-blue-600 hover:bg-blue-700 text-white"
-                    }`}
-                  >
-                    Next: Test & Mint →
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Step 3: Test & Mint */}
-            {step === 3 && (
-              <div className="space-y-6">
-                <div className="bg-white dark:bg-gray-800 rounded-lg p-6">
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-                    Step 3: Test Your Ruleset
-                  </h3>
-
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Sample Data (CSV or JSON)
-                    </label>
-                    <textarea
-                      value={testData}
-                      onChange={(e) => setTestData(e.target.value)}
-                      placeholder="player_id,spend,sessions&#10;1,100,50&#10;2,500,100&#10;3,1000,200"
-                      rows={6}
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
-                    />
-                  </div>
-
-                  <button
-                    onClick={handleTest}
-                    disabled={testing || !testData}
-                    className={`w-full py-3 rounded-lg font-bold mb-4 ${
-                      testing || !testData
-                        ? "bg-gray-300 dark:bg-gray-700 cursor-not-allowed"
-                        : "bg-purple-600 hover:bg-purple-700 text-white"
-                    }`}
-                  >
-                    {testing ? "Testing..." : "🧪 Test Ruleset"}
-                  </button>
-
-                  {testResult && (
-                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                      <p className="font-bold text-green-800 dark:text-green-300 mb-2">
-                        ✅ Test Successful!
-                      </p>
-                      <pre className="text-sm text-green-700 dark:text-green-400 overflow-auto">
-                        {JSON.stringify(testResult.analysis, null, 2)}
-                      </pre>
-                      <p className="text-xs text-green-600 dark:text-green-500 mt-2">
-                        Execution time: {testResult.execution_time}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg p-6 text-white">
-                  <h4 className="text-xl font-bold mb-2">Ready to Mint?</h4>
-                  <p className="text-blue-100 mb-4">
-                    Mint your ruleset as an NFT and start earning {(ruleset.price * 0.8).toFixed(0)} SUI per sale
-                  </p>
-                  <div className="flex items-center gap-2 text-sm mb-4">
-                    <span>✓ Stored on Walrus</span>
-                    <span>✓ Tradeable NFT</span>
-                    <span>✓ 80% revenue share</span>
-                  </div>
-                  <button
-                    onClick={handleMint}
-                    disabled={minting || !testResult || !account}
-                    className={`w-full py-3 rounded-lg font-bold ${
-                      minting || !testResult || !account
-                        ? "bg-white/50 cursor-not-allowed"
-                        : "bg-white text-blue-600 hover:bg-blue-50"
-                    }`}
-                  >
-                    {minting ? "Minting..." : !account ? "Connect Wallet to Mint" : "🎨 Mint Ruleset NFT"}
-                  </button>
-                </div>
-
-                <div className="flex gap-4">
-                  <button
-                    onClick={() => setStep(2)}
-                    className="flex-1 py-3 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg font-bold hover:bg-gray-300 dark:hover:bg-gray-600"
-                  >
-                    ← Back
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
-        ) : (
-          /* Minting Success */
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-8 text-center">
-            <div className="text-6xl mb-4">🎉</div>
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-              Ruleset NFT Minted!
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
-              Your ruleset is now live on the marketplace
-            </p>
-
-            <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg mb-6 text-left">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Transaction Digest</p>
-              <p className="font-mono text-xs text-gray-900 dark:text-white break-all">
-                {mintedNFT.tx_digest}
+        {/* Step 1: Template Selection */}
+        {step === 1 && (
+          <div className="space-y-8">
+            <div className="text-center mb-12">
+              <h2 className="text-4xl font-bold text-gray-900 mb-4">Choose a Template</h2>
+              <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+                Select a pre-built analytics template to configure. You'll customize parameters, not write code.
               </p>
             </div>
 
-            <div className="flex gap-4">
-              <Link
-                href="/marketplace"
-                className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
-              >
-                View in Marketplace
-              </Link>
-              <button
-                onClick={() => {
-                  setStep(1);
-                  setMintedNFT(null);
-                  setRuleset({ name: "", description: "", category: "gaming", ruleType: "ai", price: 50, content: "" });
-                  setTestData("");
-                  setTestResult(null);
-                }}
-                className="flex-1 px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-gray-600"
-              >
-                Create Another
-              </button>
+            {/* Gaming Templates */}
+            <div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                🎮 Gaming Templates
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {Object.values(TEMPLATES).filter(t => t.category === "Gaming").map(tmpl => (
+                  <button
+                    key={tmpl.id}
+                    onClick={() => handleTemplateSelect(tmpl.id)}
+                    className="group relative bg-white rounded-2xl p-8 border-2 border-gray-200 hover:border-blue-500 hover:shadow-xl transition-all text-left"
+                  >
+                    <div className="text-5xl mb-4">{tmpl.icon}</div>
+                    <h4 className="text-2xl font-bold text-gray-900 mb-2">{tmpl.name}</h4>
+                    <p className="text-gray-600 mb-4">{tmpl.description}</p>
+                    <div className="text-sm text-gray-500">
+                      {tmpl.parameters.length} configurable parameters
+                    </div>
+                    <div className="absolute top-8 right-8 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="text-blue-600 font-semibold">Select →</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* DeFi Templates */}
+            <div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                💰 DeFi Templates
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {Object.values(TEMPLATES).filter(t => t.category === "DeFi").map(tmpl => (
+                  <button
+                    key={tmpl.id}
+                    onClick={() => handleTemplateSelect(tmpl.id)}
+                    className="group relative bg-white rounded-2xl p-8 border-2 border-gray-200 hover:border-blue-500 hover:shadow-xl transition-all text-left"
+                  >
+                    <div className="text-5xl mb-4">{tmpl.icon}</div>
+                    <h4 className="text-2xl font-bold text-gray-900 mb-2">{tmpl.name}</h4>
+                    <p className="text-gray-600 mb-4">{tmpl.description}</p>
+                    <div className="text-sm text-gray-500">
+                      {tmpl.parameters.length} configurable parameters
+                    </div>
+                    <div className="absolute top-8 right-8 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="text-blue-600 font-semibold">Select →</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Social & IoT Templates */}
+            <div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                🌐 Social & IoT Templates
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {Object.values(TEMPLATES).filter(t => t.category === "Social" || t.category === "IoT").map(tmpl => (
+                  <button
+                    key={tmpl.id}
+                    onClick={() => handleTemplateSelect(tmpl.id)}
+                    className="group relative bg-white rounded-2xl p-8 border-2 border-gray-200 hover:border-blue-500 hover:shadow-xl transition-all text-left"
+                  >
+                    <div className="text-5xl mb-4">{tmpl.icon}</div>
+                    <h4 className="text-2xl font-bold text-gray-900 mb-2">{tmpl.name}</h4>
+                    <p className="text-gray-600 mb-4">{tmpl.description}</p>
+                    <div className="text-sm text-gray-500">
+                      {tmpl.parameters.length} configurable parameters
+                    </div>
+                    <div className="absolute top-8 right-8 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="text-blue-600 font-semibold">Select →</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}
-      </div>
+
+        {/* Step 2: Configure Parameters */}
+        {step === 2 && template && (
+          <div className="max-w-4xl mx-auto space-y-8">
+            <div className="text-center mb-12">
+              <div className="text-6xl mb-4">{template.icon}</div>
+              <h2 className="text-4xl font-bold text-gray-900 mb-2">{template.name}</h2>
+              <p className="text-xl text-gray-600">{template.description}</p>
+            </div>
+
+            <div className="bg-white rounded-2xl p-8 border-2 border-gray-200 shadow-lg space-y-6">
+              {/* Ruleset Name */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Ruleset Name
+                </label>
+                <input
+                  type="text"
+                  value={rulesetName}
+                  onChange={(e) => setRulesetName(e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-gray-900 placeholder-gray-400"
+                  placeholder="My Custom Configuration"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={rulesetDescription}
+                  onChange={(e) => setRulesetDescription(e.target.value)}
+                  rows={3}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-gray-900 placeholder-gray-400"
+                  placeholder="Describe your configuration..."
+                />
+              </div>
+
+              {/* Price */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Price per Execution (SUI)
+                </label>
+                <input
+                  type="number"
+                  value={price}
+                  onChange={(e) => setPrice(parseFloat(e.target.value))}
+                  step="0.1"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-gray-900 placeholder-gray-400"
+                />
+                <p className="text-sm text-gray-600 mt-2">
+                  You'll earn 83% ({(price * 0.83).toFixed(2)} SUI) per execution
+                </p>
+              </div>
+
+              {/* Configuration Parameters */}
+              <div className="border-t-2 border-gray-100 pt-6">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">Configuration Parameters</h3>
+                <div className="space-y-4">
+                  {template.parameters.map(param => (
+                    <div key={param.key} className="bg-gray-50 rounded-xl p-4">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        {param.label}
+                      </label>
+                      <p className="text-xs text-gray-600 mb-2">{param.description}</p>
+                      <input
+                        type={param.type}
+                        value={config[param.key]}
+                        onChange={(e) => handleConfigChange(param.key, param.type === 'number' ? parseFloat(e.target.value) : e.target.value)}
+                        step={param.type === 'number' ? "0.01" : undefined}
+                        className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-gray-900 placeholder-gray-400 bg-white"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* JSON Preview */}
+              <div className="border-t-2 border-gray-100 pt-6">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">Configuration JSON</h3>
+                <pre className="bg-gray-900 text-green-400 p-6 rounded-xl overflow-auto text-sm">
+                  {JSON.stringify(config, null, 2)}
+                </pre>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-4 pt-6">
+                <button
+                  onClick={() => setStep(1)}
+                  className="flex-1 px-6 py-4 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition-all"
+                >
+                  ← Back
+                </button>
+                <button
+                  onClick={handleUploadAndMint}
+                  disabled={!account}
+                  className={`flex-1 px-6 py-4 rounded-xl font-semibold transition-all ${
+                    account
+                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl'
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  {account ? 'Upload & Mint NFT →' : 'Connect Wallet First'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Upload Result */}
+        {step === 3 && uploadResult && (
+          <div className="max-w-3xl mx-auto">
+            <div className="bg-white rounded-2xl p-12 border-2 border-green-500 shadow-2xl text-center space-y-8">
+              <div className="text-8xl">✅</div>
+              <h2 className="text-4xl font-bold text-gray-900">Ruleset Created!</h2>
+
+              <div className="space-y-4 text-left bg-gray-50 rounded-xl p-6">
+                <div>
+                  <span className="font-semibold text-gray-700">Config Blob ID:</span>
+                  <p className="text-blue-600 font-mono text-sm mt-1">{uploadResult.config_blob_id}</p>
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-700">Ruleset NFT ID:</span>
+                  <p className="text-purple-600 font-mono text-sm mt-1 break-all">{uploadResult.ruleset_nft_id}</p>
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-700">Price:</span>
+                  <p className="text-gray-900 font-bold mt-1">{price} SUI per execution</p>
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-700">Your Earnings:</span>
+                  <p className="text-green-600 font-bold mt-1">83% = {(price * 0.83).toFixed(2)} SUI per use</p>
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-700">Estimated Revenue:</span>
+                  <p className="text-gray-600 mt-1">{uploadResult.estimated_earnings}</p>
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <Link
+                  href="/marketplace"
+                  className="flex-1 px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all"
+                >
+                  View in Marketplace
+                </Link>
+                <button
+                  onClick={() => {
+                    setStep(1);
+                    setSelectedTemplate(null);
+                    setUploadResult(null);
+                  }}
+                  className="flex-1 px-8 py-4 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition-all"
+                >
+                  Create Another
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
     </div>
   );
 }

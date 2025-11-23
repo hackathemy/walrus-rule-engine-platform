@@ -3,7 +3,7 @@
 module walrus_insight::ruleset_nft {
     use sui::object::{Self, UID, ID};
     use sui::transfer;
-    use sui::tx_context::{TxContext};
+    use sui::tx_context::{Self as tx_context, TxContext};
     use sui::event;
     use sui::clock::{Self, Clock};
     use std::string::String;
@@ -96,7 +96,7 @@ module walrus_insight::ruleset_nft {
     ) {
         assert!(price_sui > 0, EInvalidPrice);
 
-        let sender = ctx.sender();
+        let sender = tx_context::sender(ctx);
         let uid = object::new(ctx);
         let ruleset_address = object::uid_to_address(&uid);
 
@@ -128,14 +128,14 @@ module walrus_insight::ruleset_nft {
     /// Purchase a ruleset (80% to creator, 10% to platform, 10% to original creator if resale)
     public entry fun purchase_ruleset(
         ruleset: &mut Ruleset,
-        payment: Coin<SUI>,
+        mut payment: Coin<SUI>,
         treasury: &mut PlatformTreasury,
         ctx: &mut TxContext
     ) {
         let payment_amount = coin::value(&payment);
         assert!(payment_amount >= ruleset.price_sui, EInsufficientPayment);
 
-        let buyer = ctx.sender();
+        let buyer = tx_context::sender(ctx);
 
         // Calculate splits
         let platform_fee = ruleset.price_sui / 10; // 10%
@@ -177,7 +177,7 @@ module walrus_insight::ruleset_nft {
 
         event::emit(RulesetExecuted {
             ruleset_id: object::uid_to_address(&ruleset.id),
-            executor: ctx.sender(),
+            executor: tx_context::sender(ctx),
             timestamp: clock::timestamp_ms(clock),
         });
     }
@@ -188,7 +188,7 @@ module walrus_insight::ruleset_nft {
         new_price: u64,
         ctx: &mut TxContext
     ) {
-        assert!(ctx.sender() == ruleset.creator, ENotCreator);
+        assert!(tx_context::sender(ctx) == ruleset.creator, ENotCreator);
         assert!(new_price > 0, EInvalidPrice);
         ruleset.price_sui = new_price;
     }
@@ -199,7 +199,7 @@ module walrus_insight::ruleset_nft {
         new_blob_id: String,
         ctx: &mut TxContext
     ) {
-        assert!(ctx.sender() == ruleset.creator, ENotCreator);
+        assert!(tx_context::sender(ctx) == ruleset.creator, ENotCreator);
         ruleset.rule_blob_id = new_blob_id;
         ruleset.version = ruleset.version + 1;
     }

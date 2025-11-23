@@ -24,6 +24,13 @@ var/
 wheels/
 .installed.cfg
 
+# Tests
+test_*.py
+*_test.py
+*.test.js
+*.test.ts
+*.test.tsx
+
 # Node / Next.js
 node_modules/
 .next/

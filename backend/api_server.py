@@ -10,6 +10,8 @@ from flasgger import Swagger
 import os
 import importlib
 from dotenv import load_dotenv
+import json
+from datetime import datetime
 
 # Import from lambda module using importlib (lambda is a reserved keyword)
 walrus_service_module = importlib.import_module('lambda.walrus_service')
@@ -69,7 +71,7 @@ swagger = Swagger(app, config=swagger_config, template=swagger_template)
 walrus_service = WalrusService(
     publisher_url=os.getenv("WALRUS_PUBLISHER_URL", "https://publisher.walrus-testnet.walrus.space"),
     aggregator_url=os.getenv("WALRUS_AGGREGATOR_URL", "https://aggregator.walrus-testnet.walrus.space"),
-    walrus_cli_path="/Users/noname/.local/bin/walrus"
+    walrus_cli_path=os.path.expanduser("~/.local/bin/walrus")
 )
 
 @app.route('/', methods=['GET'])
@@ -398,6 +400,126 @@ def upload_blob():
 
     except Exception as e:
         print(f"❌ Upload error: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/execute', methods=['POST'])
+def execute_analysis():
+    """Execute AI analysis on uploaded data with configured template"""
+    try:
+        data = request.get_json()
+
+        # Required parameters
+        config_blob_id = data.get('config_blob_id')
+        data_blob_id = data.get('data_blob_id')
+        template_id = data.get('template_id')
+
+        if not all([config_blob_id, data_blob_id, template_id]):
+            return jsonify({
+                "success": False,
+                "error": "Missing required parameters: config_blob_id, data_blob_id, template_id"
+            }), 400
+
+        print(f"🚀 Executing analysis:")
+        print(f"   Template: {template_id}")
+        print(f"   Config: {config_blob_id}")
+        print(f"   Data: {data_blob_id}")
+
+        # Download config from Walrus
+        print(f"📥 Downloading config from Walrus...")
+        config_result = walrus_service.read_blob(config_blob_id, format_type='json')
+        if not config_result['success']:
+            raise Exception(f"Failed to download config: {config_result.get('error')}")
+
+        config = config_result['content']
+        print(f"✅ Config loaded: {config.get('name', 'Unknown')}")
+
+        # Download data from Walrus
+        print(f"📥 Downloading data from Walrus...")
+        data_result = walrus_service.read_blob(data_blob_id, format_type='text')
+        if not data_result['success']:
+            raise Exception(f"Failed to download data: {data_result.get('error')}")
+
+        user_data = data_result['content']
+        print(f"✅ Data loaded: {len(user_data)} bytes")
+
+        # Execute AI analysis
+        print(f"🤖 Running AI analysis...")
+        ai_client_module = importlib.import_module('lambda.ai_client')
+        get_ai_client = ai_client_module.get_ai_client
+
+        ai_client = get_ai_client()
+
+        # Create analysis prompt
+        analysis_prompt = f"""You are analyzing data using the "{template_id}" template.
+
+Template Configuration:
+{json.dumps(config.get('config', {}), indent=2)}
+
+User Data (first 2000 characters):
+{user_data[:2000]}
+
+Please analyze this data according to the template configuration and provide:
+1. Key findings and insights
+2. Anomalies or patterns detected
+3. Actionable recommendations
+4. Confidence scores for each finding
+
+Format your response as JSON with the following structure:
+{{
+  "summary": "Brief overview",
+  "findings": [
+    {{"type": "...", "description": "...", "confidence": 0.0-1.0}}
+  ],
+  "recommendations": ["..."],
+  "metadata": {{"analyzed_records": 0, "flagged_items": 0}}
+}}
+"""
+
+        # Call AI
+        ai_response = ai_client.generate_text(analysis_prompt)
+
+        # Try to parse as JSON, fallback to text
+        try:
+            # Extract JSON from response (might have markdown code blocks)
+            json_start = ai_response.find('{')
+            json_end = ai_response.rfind('}') + 1
+            if json_start >= 0 and json_end > json_start:
+                analysis_result = json.loads(ai_response[json_start:json_end])
+            else:
+                # Fallback: wrap text response
+                analysis_result = {
+                    "summary": "Analysis completed",
+                    "findings": [{"type": "analysis", "description": ai_response[:500], "confidence": 0.8}],
+                    "recommendations": ["Review full analysis results"],
+                    "metadata": {"analyzed_records": 0, "flagged_items": 0}
+                }
+        except json.JSONDecodeError:
+            analysis_result = {
+                "summary": "Analysis completed",
+                "findings": [{"type": "analysis", "description": ai_response[:500], "confidence": 0.8}],
+                "recommendations": ["Review full analysis results"],
+                "metadata": {"analyzed_records": 0, "flagged_items": 0}
+            }
+
+        print(f"✅ Analysis complete!")
+
+        # Return results
+        return jsonify({
+            "success": True,
+            "template": template_id,
+            "config_blob_id": config_blob_id,
+            "data_blob_id": data_blob_id,
+            "analysis": analysis_result,
+            "timestamp": datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        print(f"❌ Execute error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             "success": False,
             "error": str(e)

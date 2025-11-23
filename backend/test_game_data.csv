@@ -1,0 +1,6 @@
+player_id,total_spend,transaction_count,refund_count,avg_session_minutes,last_login
+player_001,150.50,23,0,45,2024-11-20
+player_002,89.99,12,1,32,2024-11-21
+player_003,0.00,5,0,15,2024-11-19
+player_004,299.99,45,0,78,2024-11-22
+player_005,25.00,8,3,12,2024-11-18

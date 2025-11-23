@@ -8,8 +8,8 @@ import json
 import tempfile
 import subprocess
 import re
+import requests
 from typing import Dict, Any, Optional
-from walrus import WalrusClient
 
 
 class WalrusService:
@@ -24,10 +24,6 @@ class WalrusService:
         self.publisher_url = publisher_url
         self.aggregator_url = aggregator_url
         self.walrus_cli_path = walrus_cli_path
-        self.client = WalrusClient(
-            publisher_base_url=publisher_url,
-            aggregator_base_url=aggregator_url
-        )
 
     def upload_blob(
         self,
@@ -37,12 +33,12 @@ class WalrusService:
         epochs: int = 5
     ) -> Dict[str, Any]:
         """
-        Upload file to Walrus storage
+        Upload file to Walrus storage using HTTP API
 
         Args:
             file_content: File content as bytes
             filename: Original filename
-            sui_private_key: Sui private key for payment
+            sui_private_key: Sui private key for payment (not used in HTTP API)
             epochs: Storage duration in epochs
 
         Returns:
@@ -53,50 +49,36 @@ class WalrusService:
                 'aggregator_url': str
             }
         """
-        # Save file temporarily
-        tmp_path = None
-        keystore_dir = None
-        keystore_file = None
-
         try:
-            # Create temp file
-            with tempfile.NamedTemporaryFile(
-                delete=False,
-                suffix=f"_{filename}",
-                dir="/tmp" if os.path.exists("/tmp") else None
-            ) as tmp:
-                tmp.write(file_content)
-                tmp_path = tmp.name
+            # Upload via Walrus Publisher HTTP API (PUT request)
+            url = f"{self.publisher_url}/v1/store?epochs={epochs}"
 
-            # Create temporary keystore
-            keystore_dir = tempfile.mkdtemp(
-                dir="/tmp" if os.path.exists("/tmp") else None
-            )
-            keystore_file = os.path.join(keystore_dir, "sui.keystore")
-
-            with open(keystore_file, 'w') as f:
-                json.dump([sui_private_key], f)
-
-            # Set environment
-            env = os.environ.copy()
-            env['SUI_KEYSTORE'] = keystore_file
-
-            # Upload using Walrus CLI
-            result = subprocess.run(
-                [self.walrus_cli_path, 'store', '--epochs', str(epochs), tmp_path],
-                capture_output=True,
-                text=True,
-                timeout=120,
-                env=env
+            response = requests.put(
+                url,
+                data=file_content,
+                headers={'Content-Type': 'application/octet-stream'},
+                timeout=120
             )
 
-            if result.returncode != 0:
-                raise Exception(f"Walrus upload failed: {result.stderr}")
+            if response.status_code not in [200, 201]:
+                raise Exception(f"Walrus upload failed: HTTP {response.status_code} - {response.text}")
 
-            # Parse blob ID
-            blob_id = self._parse_blob_id(result.stdout)
-            if not blob_id:
-                raise Exception(f"Could not parse blob ID from output:\n{result.stdout}")
+            # Parse response JSON
+            result = response.json()
+
+            # Extract blob ID from response
+            # Walrus API returns different formats, try both
+            if 'newlyCreated' in result:
+                blob_info = result['newlyCreated']['blobObject']
+                blob_id = blob_info['blobId']
+            elif 'alreadyCertified' in result:
+                blob_info = result['alreadyCertified']['blobObject']
+                blob_id = blob_info['blobId']
+            else:
+                # Fallback: try to extract from any field containing 'blobId'
+                blob_id = result.get('blobId') or result.get('blob_id')
+                if not blob_id:
+                    raise Exception(f"Could not extract blob_id from response: {result}")
 
             return {
                 'blob_id': blob_id,
@@ -105,14 +87,8 @@ class WalrusService:
                 'aggregator_url': f"{self.aggregator_url}/v1/{blob_id}"
             }
 
-        finally:
-            # Cleanup temp files
-            if tmp_path and os.path.exists(tmp_path):
-                os.unlink(tmp_path)
-            if keystore_file and os.path.exists(keystore_file):
-                os.unlink(keystore_file)
-            if keystore_dir and os.path.exists(keystore_dir):
-                os.rmdir(keystore_dir)
+        except requests.RequestException as e:
+            raise Exception(f"Walrus upload failed: {str(e)}")
 
     def read_blob(
         self,
@@ -136,14 +112,16 @@ class WalrusService:
                 'metadata': dict
             }
         """
-        # Get metadata
-        try:
-            metadata = self.client.get_blob_metadata(blob_id)
-        except Exception:
-            metadata = {}
+        # Get metadata (optional, not critical)
+        metadata = {}
 
-        # Read blob content
-        content = self.client.get_blob(blob_id)
+        # Read blob content via HTTP
+        try:
+            response = requests.get(f"{self.aggregator_url}/v1/{blob_id}")
+            response.raise_for_status()
+            content = response.content
+        except requests.RequestException as e:
+            raise Exception(f"Failed to read blob from Walrus: {str(e)}")
 
         # Parse based on format
         if format_type == 'json':
@@ -220,7 +198,14 @@ class WalrusService:
                 'data': list[dict]
             }
         """
-        content = self.client.get_blob(blob_id)
+        # Read blob content via HTTP
+        try:
+            response = requests.get(f"{self.aggregator_url}/v1/{blob_id}")
+            response.raise_for_status()
+            content = response.content
+        except requests.RequestException as e:
+            raise Exception(f"Failed to read blob from Walrus: {str(e)}")
+
         text_content = content.decode('utf-8')
 
         # Parse CSV
@@ -261,11 +246,14 @@ class WalrusService:
                 'metadata': dict
             }
         """
-        metadata = self.client.get_blob_metadata(blob_id)
+        # For now, return basic metadata
+        # Walrus HTTP API doesn't expose metadata endpoint yet
         return {
             'success': True,
             'blob_id': blob_id,
-            'metadata': metadata
+            'metadata': {
+                'aggregator_url': f"{self.aggregator_url}/v1/{blob_id}"
+            }
         }
 
     def _parse_blob_id(self, output: str) -> Optional[str]:
