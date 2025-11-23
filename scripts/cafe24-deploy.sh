@@ -75,15 +75,15 @@ fi
 # 6. 프로젝트 설정
 echo ""
 echo "📦 6/7 프로젝트 설정..."
-cd ~
+cd $HOME
 
 # .env 파일 확인
-if [ ! -f walrus-rule-engine-platform/.env ]; then
+if [ ! -f $HOME/walrus-rule-engine-platform/.env ]; then
     echo ""
     echo "⚠️  .env 파일이 없습니다!"
     echo ""
     echo "다음 명령어로 .env 파일을 생성해주세요:"
-    echo "  cd ~/walrus-rule-engine-platform"
+    echo "  cd $HOME/walrus-rule-engine-platform"
     echo "  nano .env"
     echo ""
     echo "필수 환경 변수:"
@@ -97,7 +97,7 @@ fi
 
 # 백엔드 설정
 echo "  → 백엔드 패키지 설치 ($PYTHON_CMD 사용)..."
-cd ~/walrus-rule-engine-platform/backend
+cd $HOME/walrus-rule-engine-platform/backend
 if [ ! -d "venv" ]; then
     $PYTHON_CMD -m venv venv
 fi
@@ -107,7 +107,7 @@ deactivate
 
 # 프론트엔드 설정
 echo "  → 프론트엔드 패키지 설치..."
-cd ~/walrus-rule-engine-platform/frontend
+cd $HOME/walrus-rule-engine-platform/frontend
 npm install --silent
 
 # .env.local 생성
@@ -126,7 +126,7 @@ fi
 echo ""
 echo "🚀 7/7 서비스 실행..."
 
-cd ~
+cd $HOME
 
 # 기존 프로세스 중지
 pm2 delete walrus-backend 2>/dev/null || true
@@ -134,7 +134,7 @@ pm2 delete walrus-frontend 2>/dev/null || true
 
 # 백엔드 실행
 echo "  → 백엔드 실행 (포트 8000, $PYTHON_CMD 사용)..."
-cd ~/walrus-rule-engine-platform/backend
+cd $HOME/walrus-rule-engine-platform/backend
 pm2 start api_server.py \
     --name walrus-backend \
     --interpreter $PYTHON_CMD \
@@ -142,7 +142,7 @@ pm2 start api_server.py \
 
 # 프론트엔드 실행
 echo "  → 프론트엔드 실행 (포트 3001)..."
-cd ~/walrus-rule-engine-platform/frontend
+cd $HOME/walrus-rule-engine-platform/frontend
 pm2 start npm \
     --name walrus-frontend \
     -- run dev -- -p 3001
@@ -195,7 +195,7 @@ echo "  pm2 restart all       - 모든 서비스 재시작"
 echo "  pm2 stop all          - 모든 서비스 중지"
 echo ""
 echo "🧪 AI 연동 테스트:"
-echo "  cd ~/walrus-rule-engine-platform/backend"
+echo "  cd $HOME/walrus-rule-engine-platform/backend"
 echo "  source venv/bin/activate"
 echo "  python3 test_ai_client.py"
 echo ""
