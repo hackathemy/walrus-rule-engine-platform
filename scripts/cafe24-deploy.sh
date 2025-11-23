@@ -33,14 +33,33 @@ else
     echo "✅ Node.js 이미 설치됨: $(node --version)"
 fi
 
-# 4. Python 설치
+# 4. Python 확인 및 설치
 echo ""
-echo "📦 4/7 Python 3.11 설치..."
-if ! command -v python3.11 &> /dev/null; then
+echo "📦 4/7 Python 확인..."
+
+# Python 3.8+ 찾기
+PYTHON_CMD=""
+for py_version in python3.11 python3.10 python3.9 python3.8 python3; do
+    if command -v $py_version &> /dev/null; then
+        # 버전 확인
+        PY_VER=$($py_version --version 2>&1 | grep -oP '\d+\.\d+' | head -1)
+        PY_MAJOR=$(echo $PY_VER | cut -d. -f1)
+        PY_MINOR=$(echo $PY_VER | cut -d. -f2)
+
+        if [ "$PY_MAJOR" -ge 3 ] && [ "$PY_MINOR" -ge 8 ]; then
+            PYTHON_CMD=$py_version
+            echo "✅ Python $PY_VER 발견: $py_version"
+            break
+        fi
+    fi
+done
+
+# Python 3.8+ 없으면 설치
+if [ -z "$PYTHON_CMD" ]; then
+    echo "⚠️  Python 3.8+ 없음. Python 3.11 설치 중..."
     apt install -y python3.11 python3.11-venv python3-pip
+    PYTHON_CMD=python3.11
     echo "✅ Python 3.11 설치 완료"
-else
-    echo "✅ Python 3.11 이미 설치됨"
 fi
 
 # 5. PM2 설치
@@ -77,10 +96,10 @@ if [ ! -f walrus-rule-engine-platform/.env ]; then
 fi
 
 # 백엔드 설정
-echo "  → 백엔드 패키지 설치..."
+echo "  → 백엔드 패키지 설치 ($PYTHON_CMD 사용)..."
 cd ~/walrus-rule-engine-platform/backend
 if [ ! -d "venv" ]; then
-    python3.11 -m venv venv
+    $PYTHON_CMD -m venv venv
 fi
 source venv/bin/activate
 pip install -q -r requirements.txt
@@ -114,11 +133,11 @@ pm2 delete walrus-backend 2>/dev/null || true
 pm2 delete walrus-frontend 2>/dev/null || true
 
 # 백엔드 실행
-echo "  → 백엔드 실행 (포트 8000)..."
+echo "  → 백엔드 실행 (포트 8000, $PYTHON_CMD 사용)..."
 cd ~/walrus-rule-engine-platform/backend
 pm2 start api_server.py \
     --name walrus-backend \
-    --interpreter python3 \
+    --interpreter $PYTHON_CMD \
     --watch false
 
 # 프론트엔드 실행
