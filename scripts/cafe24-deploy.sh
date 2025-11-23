@@ -148,8 +148,16 @@ pm2 start npm \
     -- run dev -- -p 3001
 
 # PM2 자동 시작 설정
-pm2 startup systemd -u $USER --hp $HOME | tail -1 | bash
+echo ""
+echo "🔄 PM2 자동 시작 설정..."
+# PM2 startup 명령 실행
+STARTUP_CMD=$(pm2 startup systemd -u $USER --hp $HOME | grep "sudo")
+if [ ! -z "$STARTUP_CMD" ]; then
+    echo "  실행 중: $STARTUP_CMD"
+    eval $STARTUP_CMD
+fi
 pm2 save
+echo "  ✅ PM2 프로세스 저장 완료"
 
 # 방화벽 설정
 echo ""
